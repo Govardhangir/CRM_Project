@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="col-md-6 offset-md-3">
+    <h1>Register</h1>
+    <br/>
+
+    <form method="POST" action="">
+        {% csrf_token %}
+
+        {% if form.errors %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>Oops! There are some errors in your form:</strong>
+                <ul>
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}
+                            <li><strong>{{ field|title }}:</strong> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endif %}
+
+        <!-- Username -->
+        <div class="mb-3">
+            <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+            {{ form.username }}
+        </div>
+
+        <!-- Email -->
+        <div class="mb-3">
+            <label for="{{ form.email.id_for_label }}" class="form-label">Email Address</label>
+            {{ form.email }}
+        </div>
+
+        <!-- First Name -->
+        <div class="mb-3">
+            <label for="{{ form.first_name.id_for_label }}" class="form-label">First Name</label>
+            {{ form.first_name }}
+        </div>
+
+        <!-- Last Name -->
+        <div class="mb-3">
+            <label for="{{ form.last_name.id_for_label }}" class="form-label">Last Name</label>
+            {{ form.last_name }}
+        </div>
+
+        <!-- Password -->
+        <div class="mb-3">
+            <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
+            {{ form.password1 }}
+            <div class="form-text">Your password must be at least 8 characters long, contain numbers and special characters.</div>
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="mb-3">
+            <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>
+            {{ form.password2 }}
+        </div>
+
+        <br/>
+        <button type="submit" class="btn btn-primary">Register</button>
+    </form>
+
+    <br>
+    <p>Already have an account? <a href="{% url 'login' %}">Login here</a></p>
+</div>
+
+{% endblock %}
