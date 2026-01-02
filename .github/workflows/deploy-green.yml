@@ -7,75 +7,79 @@ on:
 
 jobs:
   deploy-green:
+    name: Green Deployment
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout code
+      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Python
-      - name: Set up Python
+      # 2️⃣ Setup Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 3. Install dependencies (CI validation)
-      - name: Install dependencies
+      # 3️⃣ Build & dependency check (CI validation)
+      - name: Install dependencies (CI)
         run: |
           python -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Django checks
-      - name: Django system checks
+      # 4️⃣ Django checks
+      - name: Django system check
         run: |
           source venv/bin/activate
           cd dcrm
           python manage.py check
 
-      # 5. Install SSH key
-      - name: Setup SSH access
+      # 5️⃣ Setup SSH
+      - name: Install SSH key
         uses: shimataro/ssh-key-action@v2
         with:
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          known_hosts: ${{ secrets.KNOWN_HOSTS }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          known_hosts: ${{ secrets.EC2_KNOWN_HOSTS }}
 
-      # 6. Deploy to GREEN
+      # 6️⃣ Deploy to GREEN (EC2)
       - name: Deploy to GREEN environment
         run: |
-          ssh gova@${{ secrets.SERVER_IP }} << 'EOF'
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
             cd /var/www/django-crm/crm-green
 
+            echo "Pulling latest code..."
             git pull origin develop
 
-            if [ ! -d ".venv" ]; then
-              python3 -m venv .venv
-            fi
-
+            echo "Activating virtual environment..."
             source .venv/bin/activate
+
+            echo "Installing dependencies..."
             pip install -r requirements.txt
 
+            echo "Running migrations..."
             cd dcrm
             python manage.py migrate
 
-            tmux kill-session -t green || true
-            tmux new-session -d -s green "python manage.py runserver 0.0.0.0:8001"
+            echo "Restarting GREEN app..."
+            pkill -f "runserver 0.0.0.0:8001" || true
+            nohup python manage.py runserver 0.0.0.0:8001 > green.log 2>&1 &
           EOF
 
-      # 7. Health check
-      - name: Health check GREEN
+      # 7️⃣ Health check
+      - name: Health check (GREEN)
         run: |
-          sleep 5
-          curl -f http://${{ secrets.SERVER_IP }}:8001
+          sleep 8
+          curl -f http://${{ secrets.EC2_HOST }}:8001
 
-      # 8. Deployment status
+      # 8️⃣ Success message
       - name: Deployment success
         if: success()
-        run: echo "GREEN deployment successful"
+        run: echo "✅ GREEN deployment successful"
 
-      - name: Deployment failure
+      # 9️⃣ Failure message
+      - name: Deployment failed
         if: failure()
-        run: echo "GREEN deployment failed – Blue untouched"
+        run: echo "❌ GREEN deployment failed"
