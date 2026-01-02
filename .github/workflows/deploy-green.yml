@@ -53,23 +53,16 @@ jobs:
 
             cd /var/www/django-crm/crm-green
 
-            echo "🧹 Resetting GREEN to GitHub state"
             git fetch origin
             git reset --hard origin/develop
             git clean -fd
 
-            echo "🐍 Activating virtual environment"
             source .venv/bin/activate
-
-            echo "📦 Installing dependencies"
             pip install -r requirements.txt
 
             cd dcrm
-
-            echo "🗄️ Running migrations"
             python manage.py migrate
 
-            echo "🔁 Restarting GREEN on port 8001"
             pkill -f "runserver 0.0.0.0:8001" || true
 
             nohup python manage.py runserver 0.0.0.0:8001 \
@@ -77,19 +70,19 @@ jobs:
 
             sleep 3
 
-            echo "📌 Checking port 8001"
             ss -lntp | grep 8001 || (echo "❌ Django not listening on 8001" && exit 1)
 
             echo "✅ GREEN started successfully"
           EOF
 
-      # 7️⃣ Health check
+      # 7️⃣ Health check (CORRECT)
       - name: Health check GREEN
         run: |
-          echo "⏳ Waiting for GREEN to respond..."
+          echo "⏳ Checking GREEN via admin login page..."
           for i in {1..10}; do
-            if curl -f http://${{ secrets.SERVER_IP }}:8001; then
-              echo "✅ GREEN is healthy"
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://${{ secrets.SERVER_IP }}:8001/admin/login/)
+            if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+              echo "✅ GREEN healthy (HTTP $STATUS)"
               exit 0
             fi
             sleep 2
