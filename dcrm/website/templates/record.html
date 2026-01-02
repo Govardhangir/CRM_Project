@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="col-md-6 offset-md-3">
+<h1>Record</h1>
+<br/>
+
+<h3>{{ customer_record.first_name }} {{ customer_record.last_name }}</h3>
+<br/>
+
+<h5>Email: {{ customer_record.email }}</h5>
+<h5>Phone: {{ customer_record.phone }}</h5>
+<h5>Address: {{ customer_record.address }}</h5>
+<h5>City: {{ customer_record.city }}</h5>
+<h5>State: {{ customer_record.state }}</h5>
+<h5>Zipcode: {{ customer_record.zipcode }}</h5>
+<h5>Created At: {{ customer_record.created_at }}</h5>
+<br/>
+
+<a href="{% url 'home' %}" class="btn btn-secondary">Back</a>
+<a href="{% url 'update_record' customer_record.id %}" class="btn btn-primary">Update</a>
+<a href="{% url 'delete_record' customer_record.id %}" class="btn btn-danger">Delete</a>
+
+</div>
+
+{% endblock %}
