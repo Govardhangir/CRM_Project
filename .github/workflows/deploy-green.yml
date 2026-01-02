@@ -75,20 +75,14 @@ jobs:
             echo "✅ GREEN started successfully"
           EOF
 
-      # 7️⃣ Health check (CORRECT)
-      - name: Health check GREEN
+      # 7️⃣ Health check (LOCALHOST – FIXED)
+      - name: Health check GREEN (localhost)
         run: |
-          echo "⏳ Checking GREEN via admin login page..."
-          for i in {1..10}; do
-            STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://${{ secrets.SERVER_IP }}:8001/admin/login/)
-            if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
-              echo "✅ GREEN healthy (HTTP $STATUS)"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "❌ GREEN failed health check"
-          exit 1
+          echo "⏳ Checking GREEN from inside EC2..."
+          ssh -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} \
+          "curl -f http://127.0.0.1:8001/admin/login/"
 
       # 8️⃣ Success
       - name: Deployment success
