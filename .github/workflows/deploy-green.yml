@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 3️⃣ CI build & dependency validation
+      # 3️⃣ CI dependency validation
       - name: Install dependencies (CI validation)
         run: |
           python -m venv venv
@@ -35,60 +35,69 @@ jobs:
           cd dcrm
           python manage.py check
 
-      # 5️⃣ Setup SSH (for EC2 access)
+      # 5️⃣ Setup SSH
       - name: Setup SSH
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           known_hosts: ${{ secrets.KNOWN_HOSTS }}
 
-      # 6️⃣ Deploy to GREEN on EC2
+      # 6️⃣ Deploy to GREEN
       - name: Deploy to GREEN environment
         run: |
           ssh -o StrictHostKeyChecking=no \
           -o UserKnownHostsFile=/dev/null \
           ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             set -e
-            echo "🚀 Deploying Django CRM to GREEN..."
+            echo "🚀 Deploying to GREEN..."
 
             cd /var/www/django-crm/crm-green
 
-            echo "📥 Fetching latest code"
             git fetch origin
             git checkout develop
             git pull origin develop
 
-            echo "🐍 Activating virtual environment"
             source .venv/bin/activate
 
-            echo "📦 Installing dependencies"
             pip install -r requirements.txt
 
             cd dcrm
-
-            echo "🗄️ Running migrations"
             python manage.py migrate
 
             echo "🔁 Restarting GREEN app on port 8001"
             pkill -f "runserver 0.0.0.0:8001" || true
-            nohup python manage.py runserver 0.0.0.0:8001 > green.log 2>&1 &
 
-            echo "✅ GREEN app is running on port 8001"
+            nohup python manage.py runserver 0.0.0.0:8001 \
+              > /var/www/django-crm/crm-green/green.log 2>&1 &
+
+            sleep 2
+
+            echo "📌 Checking if Django is listening on 8001"
+            ss -lntp | grep 8001 || (echo "❌ Django failed to bind to 8001" && exit 1)
+
+            echo "✅ GREEN started successfully"
           EOF
 
-      # 7️⃣ Health check (CRITICAL)
+      # 7️⃣ Health check (robust)
       - name: Health check GREEN
         run: |
-          echo "⏳ Waiting for app to start..."
-          sleep 6
-          curl -f http://${{ secrets.SERVER_IP }}:8001
+          echo "⏳ Waiting for GREEN to respond..."
+          for i in {1..10}; do
+            if curl -f http://${{ secrets.SERVER_IP }}:8001; then
+              echo "✅ GREEN is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ GREEN failed health check"
+          exit 1
 
-      # 8️⃣ Deployment success
+      # 8️⃣ Success
       - name: Deployment success
         if: success()
         run: echo "✅ GREEN deployment successful"
 
-      # 9️⃣ Deployment failure
+      # 9️⃣ Failure
       - name: Deployment failed
         if: failure()
         run: echo "❌ GREEN deployment failed — BLUE untouched"
