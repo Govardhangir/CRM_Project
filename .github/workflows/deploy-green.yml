@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 3️⃣ Install dependencies (CI validation)
+      # 3️⃣ Install dependencies (CI validation only)
       - name: Install dependencies (CI)
         run: |
           python -m venv venv
@@ -36,6 +36,12 @@ jobs:
           cd dcrm
           python manage.py check
 
+      # 🔎 DEBUG (TEMPORARY – remove after success)
+      - name: Debug SSH variables
+        run: |
+          echo "EC2_USER=${{ secrets.EC2_USER }}"
+          echo "EC2_HOST=${{ secrets.EC2_HOST }}"
+
       # 5️⃣ Setup SSH
       - name: Install SSH key
         uses: shimataro/ssh-key-action@v2
@@ -46,9 +52,11 @@ jobs:
       # 6️⃣ Deploy to GREEN (EC2)
       - name: Deploy to GREEN environment
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=yes \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
 
+            echo "Moving to GREEN directory..."
             cd /var/www/django-crm/crm-green
 
             echo "Pulling latest code..."
@@ -58,13 +66,14 @@ jobs:
             source .venv/bin/activate
 
             echo "Installing dependencies..."
+            pip install --upgrade pip
             pip install -r requirements.txt
 
             echo "Running migrations..."
             cd dcrm
             python manage.py migrate
 
-            echo "Restarting GREEN app..."
+            echo "Restarting GREEN app on port 8001..."
             pkill -f "runserver 0.0.0.0:8001" || true
             nohup python manage.py runserver 0.0.0.0:8001 > green.log 2>&1 &
           EOF
@@ -72,7 +81,7 @@ jobs:
       # 7️⃣ Health check
       - name: Health check (GREEN)
         run: |
-          sleep 8
+          sleep 10
           curl -f http://${{ secrets.EC2_HOST }}:8001
 
       # 8️⃣ Success message
