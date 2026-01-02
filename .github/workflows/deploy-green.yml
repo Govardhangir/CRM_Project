@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code
+      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -20,65 +20,75 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 3️⃣ Install dependencies (CI validation)
-      - name: Install dependencies
+      # 3️⃣ CI build & dependency validation
+      - name: Install dependencies (CI validation)
         run: |
           python -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4️⃣ Django checks
+      # 4️⃣ Django system checks
       - name: Django system checks
         run: |
           source venv/bin/activate
           cd dcrm
           python manage.py check
 
-      # 5️⃣ Setup SSH
+      # 5️⃣ Setup SSH (for EC2 access)
       - name: Setup SSH
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           known_hosts: ${{ secrets.KNOWN_HOSTS }}
 
-      # 6️⃣ Deploy to GREEN
+      # 6️⃣ Deploy to GREEN on EC2
       - name: Deploy to GREEN environment
         run: |
           ssh -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
           ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             set -e
-            echo "🚀 Deploying to GREEN..."
+            echo "🚀 Deploying Django CRM to GREEN..."
 
             cd /var/www/django-crm/crm-green
 
+            echo "📥 Fetching latest code"
+            git fetch origin
+            git checkout develop
             git pull origin develop
 
+            echo "🐍 Activating virtual environment"
             source .venv/bin/activate
+
+            echo "📦 Installing dependencies"
             pip install -r requirements.txt
 
             cd dcrm
+
+            echo "🗄️ Running migrations"
             python manage.py migrate
 
+            echo "🔁 Restarting GREEN app on port 8001"
             pkill -f "runserver 0.0.0.0:8001" || true
             nohup python manage.py runserver 0.0.0.0:8001 > green.log 2>&1 &
 
-            echo "✅ GREEN app started on port 8001"
+            echo "✅ GREEN app is running on port 8001"
           EOF
 
-      # 7️⃣ Health check
+      # 7️⃣ Health check (CRITICAL)
       - name: Health check GREEN
         run: |
-          sleep 5
+          echo "⏳ Waiting for app to start..."
+          sleep 6
           curl -f http://${{ secrets.SERVER_IP }}:8001
 
-      # 8️⃣ Success message
+      # 8️⃣ Deployment success
       - name: Deployment success
         if: success()
         run: echo "✅ GREEN deployment successful"
 
-      # 9️⃣ Failure message
+      # 9️⃣ Deployment failure
       - name: Deployment failed
         if: failure()
-        run: echo "❌ GREEN deployment failed"
-
+        run: echo "❌ GREEN deployment failed — BLUE untouched"
