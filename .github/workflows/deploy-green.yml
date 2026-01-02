@@ -49,6 +49,7 @@ jobs:
           -o UserKnownHostsFile=/dev/null \
           ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             set -e
+
             echo "🚀 Deploying to GREEN..."
 
             cd /var/www/django-crm/crm-green
@@ -58,22 +59,21 @@ jobs:
             git pull origin develop
 
             source .venv/bin/activate
-
             pip install -r requirements.txt
 
             cd dcrm
             python manage.py migrate
 
-            echo "🔁 Restarting GREEN app on port 8001"
+            echo "🔁 Restarting GREEN on port 8001"
             pkill -f "runserver 0.0.0.0:8001" || true
 
             nohup python manage.py runserver 0.0.0.0:8001 \
-              > /var/www/django-crm/crm-green/green.log 2>&1 &
+              > green.log 2>&1 &
 
-            sleep 2
+            sleep 3
 
-            echo "📌 Checking if Django is listening on 8001"
-            ss -lntp | grep 8001 || (echo "❌ Django failed to bind to 8001" && exit 1)
+            echo "📌 Checking port 8001"
+            ss -lntp | grep 8001 || (echo "❌ Django not listening on 8001" && exit 1)
 
             echo "✅ GREEN started successfully"
           EOF
@@ -92,12 +92,12 @@ jobs:
           echo "❌ GREEN failed health check"
           exit 1
 
-      # 8️⃣ Success
+      # 8️⃣ Deployment success
       - name: Deployment success
         if: success()
         run: echo "✅ GREEN deployment successful"
 
-      # 9️⃣ Failure
+      # 9️⃣ Deployment failure
       - name: Deployment failed
         if: failure()
         run: echo "❌ GREEN deployment failed — BLUE untouched"
