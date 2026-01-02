@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 3️⃣ Build & dependency check (CI validation)
+      # 3️⃣ Install dependencies (CI validation)
       - name: Install dependencies (CI)
         run: |
           python -m venv venv
@@ -29,7 +29,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4️⃣ Django checks
+      # 4️⃣ Django system checks
       - name: Django system check
         run: |
           source venv/bin/activate
@@ -48,6 +48,7 @@ jobs:
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
+
             cd /var/www/django-crm/crm-green
 
             echo "Pulling latest code..."
