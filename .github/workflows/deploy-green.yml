@@ -35,7 +35,7 @@ jobs:
           cd dcrm
           python manage.py check
 
-      # 5️⃣ Install SSH key
+      # 5️⃣ Setup SSH
       - name: Setup SSH
         uses: shimataro/ssh-key-action@v2
         with:
@@ -45,23 +45,32 @@ jobs:
       # 6️⃣ Deploy to GREEN
       - name: Deploy to GREEN environment
         run: |
-          ssh gova@YOUR_SERVER_IP << 'EOF'
+          ssh -o StrictHostKeyChecking=no \
+          ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             set -e
+            echo "🚀 Deploying to GREEN..."
+
             cd /var/www/django-crm/crm-green
+
             git pull origin develop
+
             source .venv/bin/activate
             pip install -r requirements.txt
+
             cd dcrm
             python manage.py migrate
+
             pkill -f "runserver 0.0.0.0:8001" || true
             nohup python manage.py runserver 0.0.0.0:8001 > green.log 2>&1 &
+
+            echo "✅ GREEN app started on port 8001"
           EOF
 
       # 7️⃣ Health check
       - name: Health check GREEN
         run: |
           sleep 5
-          curl -f http://YOUR_SERVER_IP:8001
+          curl -f http://${{ secrets.SERVER_IP }}:8001
 
       # 8️⃣ Success message
       - name: Deployment success
@@ -72,3 +81,4 @@ jobs:
       - name: Deployment failed
         if: failure()
         run: echo "❌ GREEN deployment failed"
+
