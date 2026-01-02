@@ -42,33 +42,38 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           known_hosts: ${{ secrets.KNOWN_HOSTS }}
 
-      # 6️⃣ Deploy to GREEN
+      # 6️⃣ Deploy to GREEN (FORCE SYNC)
       - name: Deploy to GREEN environment
         run: |
           ssh -o StrictHostKeyChecking=no \
           -o UserKnownHostsFile=/dev/null \
           ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             set -e
-
             echo "🚀 Deploying to GREEN..."
 
             cd /var/www/django-crm/crm-green
 
+            echo "🧹 Resetting GREEN to GitHub state"
             git fetch origin
-            git checkout develop
-            git pull origin develop
+            git reset --hard origin/develop
+            git clean -fd
 
+            echo "🐍 Activating virtual environment"
             source .venv/bin/activate
+
+            echo "📦 Installing dependencies"
             pip install -r requirements.txt
 
             cd dcrm
+
+            echo "🗄️ Running migrations"
             python manage.py migrate
 
             echo "🔁 Restarting GREEN on port 8001"
             pkill -f "runserver 0.0.0.0:8001" || true
 
             nohup python manage.py runserver 0.0.0.0:8001 \
-              > green.log 2>&1 &
+              > /var/www/django-crm/crm-green/green.log 2>&1 &
 
             sleep 3
 
@@ -78,7 +83,7 @@ jobs:
             echo "✅ GREEN started successfully"
           EOF
 
-      # 7️⃣ Health check (robust)
+      # 7️⃣ Health check
       - name: Health check GREEN
         run: |
           echo "⏳ Waiting for GREEN to respond..."
@@ -92,12 +97,12 @@ jobs:
           echo "❌ GREEN failed health check"
           exit 1
 
-      # 8️⃣ Deployment success
+      # 8️⃣ Success
       - name: Deployment success
         if: success()
         run: echo "✅ GREEN deployment successful"
 
-      # 9️⃣ Deployment failure
+      # 9️⃣ Failure
       - name: Deployment failed
         if: failure()
         run: echo "❌ GREEN deployment failed — BLUE untouched"
